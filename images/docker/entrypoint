@@ -1,0 +1,93 @@
+#!/bin/bash -l
+#Make our script a little bit safer
+set -eo pipefail
+
+log::m-info "Ensuring $APP permissions..."
+chown -R $POSTGRES_USER:$POSTGRES_USER $POSTGRES_DATA
+chmod 700 $POSTGRES_DATA
+
+log::m-info "Check necessary directories and files"
+if [ ! -d "$POSTGRES_DATA" ]; then
+    log::m-info "There is no $POSTGRES_DATA. Creating one..."
+    mkdir -p $POSTGRES_DATA
+    chown -R $POSTGRES_USER:$POSTGRES_USER $POSTGRES_DATA
+    chmod 700 $POSTGRES_DATA
+fi
+
+if [ -d "$POSTGRES_DATA/lost+found" ]; then
+    rm -rf "$POSTGRES_DATA/lost+found"
+fi
+
+if [ ! -s "$POSTGRES_DATA/PG_VERSION" ]; then
+    log::m-info "There is no PG_VERSION file. Looks like fresh start..."
+
+    if [ "$POSTGRES_PASSWORD" ]; then
+        echo "Password is enabled for PostgreSQL instance"
+        log::m-info "Runnning initdb using password mode..."
+        echo $POSTGRES_PASSWORD > /tmp/postgres.password
+        gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/initdb -D $POSTGRES_DATA \
+        --pwfile=/tmp/postgres.password \
+        $POSTGRES_INITDB_ARGS
+
+        #Remove the password file
+        rm -f /tmp/postgres.password
+
+        authMethod=md5
+
+
+    else
+        echo "Password is NOT enabled for PostgreSQL instance"
+        log::m-info "Runnning initdb without any password..."
+        gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/initdb -D $POSTGRES_DATA $POSTGRES_INITDB_ARGS
+
+        # The - option suppresses leading tabs but *not* spaces. :)
+        cat >&2 <<-'EOWARN'
+	    ****************************************************
+	    WARNING: We strongly recommend to set a password!!!
+	         This will allow anyone with access to the
+	         Postgres port to access your database. In
+	         Docker's default configuration, this is
+	         effectively any other container on the same
+	         system.
+	         Use "-e POSTGRES_PASSWORD=password" to set
+	         it in "docker run".
+	    ****************************************************
+EOWARN
+        pass=
+	    authMethod=trust
+    fi
+    echo "local all $POSTGRES_USER $authMethod" >> "$POSTGRES_DATA/pg_hba.conf"
+    echo "host all all all $authMethod" >> "$POSTGRES_DATA/pg_hba.conf"
+
+    log::m-info "Runnning $APP in safe mode..."
+    gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/pg_ctl -D $POSTGRES_DATA \
+    -o "-c listen_addresses='127.0.0.1'" \
+    -w start
+
+    psql+=( --username "$POSTGRES_USER" --dbname "$POSTGRES_USER" )
+
+    log::m-info "Running init scripts..."
+    for f in /initdb.d/*; do
+        case "$f" in
+            *.sh)     echo "$0: running $f"; . "$f" ;;
+            *.sql)    echo "$0: running $f"; "${psql[@]}" -f "$f"; echo ;;
+            *.sql.gz) echo "$0: running $f"; gunzip -c "$f" | "${psql[@]}"; echo ;;
+            *)        echo "$0: ignoring $f" ;;
+        esac
+    done
+
+    log::m-info "Stopping init mode..."
+    gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/pg_ctl -D "$POSTGRES_DATA" -m fast -w stop
+    echo
+fi
+
+log::m-info "Ensuring $APP permissions..."
+chown -R $POSTGRES_USER:$POSTGRES_USER $POSTGRES_DATA
+mkdir -p /var/run/postgresql/9.4-main.pg_stat_tmp
+touch /var/run/postgresql/9.4-main.pg_stat_tmp/global.tmp
+chown -R $POSTGRES_USER:$POSTGRES_USER /var/run/postgresql/
+chmod 700 $POSTGRES_DATA
+
+log::m-info "Starting $APP ..."
+exec gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/postgres -D $POSTGRES_DATA \
+-c 'config_file=/etc/postgresql/9.4/main/postgresql.conf'
