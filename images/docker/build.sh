@@ -5,22 +5,34 @@ set -e
 # Use local cache proxy if it can be reached, else nothing.
 eval $(detect-proxy enable)
 
+# It's necessary to install some dependencies such as wget or curl
+log::m-info "Installing initial programms ..."
+apt-get update -qq 
+apt-get install -yqq wget ca-certificates
+
 log::m-info "Installing Yeti repo key ..."
 apt-key adv --keyserver keys.gnupg.net --recv-key 9CEBFFC569A832B6
 
 log::m-info "Adding Yeti repo to /etc/apt ..."
-echo 'deb http://pkg.yeti-switch.org/debian/jessie stable main ext' >> /etc/apt/sources.list
+echo 'deb http://pkg.yeti-switch.org/debian/stretch 1.7 main' >> /etc/apt/sources.list
+
+log::m-info "Installing PGQD repo key ..."
+wget https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | apt-key add -
+
+log::m-info "Adding PGQD repo to /etc/apt ..."
+echo 'deb http://apt.postgresql.org/pub/repos/apt/ stretch-pgdg main' >> /etc/apt/sources.list
 
 log::m-info "Installing essentials ..."
 apt-get update -qq
 apt-get install -yqq \
-    ca-certificates \
-    postgresql-contrib-9.4 \
-    postgresql-9.4-prefix \
-    postgresql-9.4-pgq3 \
-    postgresql-9.4-yeti \
+    postgresql-10 \
+    postgresql-10-prefix \
+    postgresql-10-pgq3 \
+    postgresql-10-pgq-ext \
+    postgresql-10-yeti \
+    pgqd \
     locales \
-	iputils-ping
+    iputils-ping
 
 log::m-info "Installing locales ..."
 
@@ -36,9 +48,6 @@ export LANG=en_US.UTF-8
 #exec /usr/sbin/locale-gen
 #locale-gen en_US.UTF-8
 #update-locale
-
-log::m-info "Removing jq and git ..."
-apt-get purge -y --auto-remove git
 
 log::m-info "Cleaning up ..."
 apt-clean --aggressive

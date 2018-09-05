@@ -25,7 +25,7 @@ if [ ! -s "$POSTGRES_DATA/PG_VERSION" ]; then
         echo "Password is enabled for PostgreSQL instance"
         log::m-info "Runnning initdb using password mode..."
         echo $POSTGRES_PASSWORD > /tmp/postgres.password
-        gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/initdb -D $POSTGRES_DATA \
+        gosu $POSTGRES_USER /usr/lib/postgresql/10/bin/initdb -D $POSTGRES_DATA \
         --pwfile=/tmp/postgres.password \
         $POSTGRES_INITDB_ARGS
 
@@ -38,7 +38,7 @@ if [ ! -s "$POSTGRES_DATA/PG_VERSION" ]; then
     else
         echo "Password is NOT enabled for PostgreSQL instance"
         log::m-info "Runnning initdb without any password..."
-        gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/initdb -D $POSTGRES_DATA $POSTGRES_INITDB_ARGS
+        gosu $POSTGRES_USER /usr/lib/postgresql/10/bin/initdb -D $POSTGRES_DATA $POSTGRES_INITDB_ARGS
 
         # The - option suppresses leading tabs but *not* spaces. :)
         cat >&2 <<-'EOWARN'
@@ -60,7 +60,7 @@ EOWARN
     echo "host all all all $authMethod" >> "$POSTGRES_DATA/pg_hba.conf"
 
     log::m-info "Runnning $APP in safe mode..."
-    gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/pg_ctl -D $POSTGRES_DATA \
+    gosu $POSTGRES_USER /usr/lib/postgresql/10/bin/pg_ctl -D $POSTGRES_DATA \
     -o "-c listen_addresses='127.0.0.1'" \
     -w start
 
@@ -77,17 +77,17 @@ EOWARN
     done
 
     log::m-info "Stopping init mode..."
-    gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/pg_ctl -D "$POSTGRES_DATA" -m fast -w stop
+    gosu $POSTGRES_USER /usr/lib/postgresql/10/bin/pg_ctl -D "$POSTGRES_DATA" -m fast -w stop
     echo
 fi
 
 log::m-info "Ensuring $APP permissions..."
 chown -R $POSTGRES_USER:$POSTGRES_USER $POSTGRES_DATA
-mkdir -p /var/run/postgresql/9.4-main.pg_stat_tmp
-touch /var/run/postgresql/9.4-main.pg_stat_tmp/global.tmp
+mkdir -p /var/run/postgresql/10-main.pg_stat_tmp
+touch /var/run/postgresql/10-main.pg_stat_tmp/global.tmp
 chown -R $POSTGRES_USER:$POSTGRES_USER /var/run/postgresql/
 chmod 700 $POSTGRES_DATA
 
 log::m-info "Starting $APP ..."
-exec gosu $POSTGRES_USER /usr/lib/postgresql/9.4/bin/postgres -D $POSTGRES_DATA \
--c 'config_file=/etc/postgresql/9.4/main/postgresql.conf'
+exec gosu $POSTGRES_USER /usr/lib/postgresql/10/bin/postgres -D $POSTGRES_DATA \
+-c 'config_file=/etc/postgresql/10/main/postgresql.conf'
