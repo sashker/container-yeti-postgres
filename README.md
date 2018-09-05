@@ -34,6 +34,7 @@ It's simple. There all data will be stored. You can change it for any particular
 You may put ***.sql**, ***.sql.gz**, or ***.sh** into **/initdb.d** directory and once the initdb stage is completed they will be run.
 
 For example, you can create Yeti's databases and users:
+    
     #!/bin/bash
     set -e
 
