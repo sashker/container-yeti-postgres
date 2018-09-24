@@ -1,4 +1,4 @@
-FROM telephoneorg/debian:stretch
+FROM postgres:10.5
 
 LABEL maintainer="Alexander Mustafin <mustafin.aleksandr@gmail.com>"
 
@@ -27,7 +27,7 @@ VOLUME ["$HOME"]
 
 SHELL ["/bin/bash", "-lc"]
 
-COPY entrypoint /
+#COPY entrypoint /
 
-ENTRYPOINT ["/dumb-init", "--"]
-CMD ["/entrypoint"]
+#ENTRYPOINT ["/dumb-init", "--"]
+#CMD ["/entrypoint"]
